@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { BookOpen, Sprout, Calendar } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-import { getUsers, getLatestSelection, saveSelection } from "./actions"
+import { getUsers, getLatestSelection, saveSelection, getSummaryOrder, saveSummaryOrder } from "./actions"
 
 interface Candidate {
   id: string
@@ -42,6 +42,8 @@ export default function PickerPage() {
   const [winner, setWinner] = useState<Candidate | null>(null)
   const [lastWinnerId, setLastWinnerId] = useState<string | null>(null)
   const [hasSelectedThisWeek, setHasSelectedThisWeek] = useState(false)
+  const [summaryOrder, setSummaryOrder] = useState<any[] | null>(null)
+  const [isGeneratingOrder, setIsGeneratingOrder] = useState(false)
 
   const [mounted, setMounted] = useState(false)
   const [nextSaturday, setNextSaturday] = useState("")
@@ -70,6 +72,13 @@ export default function PickerPage() {
           })
           setHasSelectedThisWeek(true)
           setHighlightIdx(mappedCandidates.findIndex((c: any) => c.id === selection.userId._id))
+        }
+      })
+
+      // Fetch summary order for the week
+      getSummaryOrder().then((order) => {
+        if (order) {
+          setSummaryOrder(order.orderedUserIds)
         }
       })
     })
@@ -136,6 +145,25 @@ export default function PickerPage() {
       }
     }, 100)
   }, [picking, candidates, lastWinnerId, hasSelectedThisWeek])
+
+  const generateSummaryOrder = useCallback(async () => {
+    if (!candidates.length || summaryOrder) return
+    setIsGeneratingOrder(true)
+
+    // 100% Random shuffle
+    const shuffledIds = candidates
+      .map((c) => c.id)
+      .sort(() => Math.random() - 0.5)
+
+    try {
+      const order = await saveSummaryOrder(shuffledIds)
+      setSummaryOrder(order.orderedUserIds)
+    } catch (error) {
+      console.error("Failed to save summary order:", error)
+    } finally {
+      setIsGeneratingOrder(false)
+    }
+  }, [candidates, summaryOrder])
 
   return (
     <main className="min-h-screen p-6 md:p-12 flex flex-col items-center justify-center relative overflow-hidden bg-background">
@@ -242,6 +270,45 @@ export default function PickerPage() {
               <p className="text-3xl md:text-5xl lg:text-6xl font-black text-primary mt-1 tracking-tight">
                 {winner.name}
               </p>
+            </div>
+          )}
+
+          {winner && !summaryOrder && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={generateSummaryOrder}
+              disabled={isGeneratingOrder}
+              className="mt-4 border-primary/20 text-primary hover:bg-primary/5 rounded-full px-6 font-medium"
+            >
+              {isGeneratingOrder ? "Sorting..." : "Generate Summary Order"}
+            </Button>
+          )}
+
+          {summaryOrder && (
+            <div className="mt-8 w-full max-w-md bg-primary/5 rounded-3xl p-6 border border-primary/10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <h3 className="text-center text-xs font-black text-primary/40 tracking-[0.3em] uppercase mb-6">
+                Summary Presentation Order
+              </h3>
+              <div className="space-y-4">
+                {summaryOrder.map((user, idx) => (
+                  <div key={user._id} className="flex items-center justify-between group">
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-black text-primary border border-primary/10">
+                        {idx + 1}
+                      </div>
+                      <span className="font-medium text-sm text-foreground/80 group-hover:text-primary transition-colors">
+                        {user.name}
+                      </span>
+                    </div>
+                    {user._id === winner?.id && (
+                      <Badge className="bg-primary/10 text-primary border-primary/20 text-[9px] font-black uppercase px-2 py-0">
+                        Facilitator
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

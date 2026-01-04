@@ -3,6 +3,7 @@
 import dbConnect from "@/lib/db"
 import User from "@/models/User"
 import WeeklySelection from "@/models/Selection"
+import SummaryOrder from "@/models/SummaryOrder"
 
 function getNextSaturdayDate() {
   const d = new Date()
@@ -53,4 +54,30 @@ export async function saveSelection(userId: string) {
   })
 
   return JSON.parse(JSON.stringify(selection))
+}
+
+export async function getSummaryOrder() {
+  await dbConnect()
+  const week = getNextSaturdayDate()
+  const order = await SummaryOrder.findOne({ week }).populate("orderedUserIds").lean()
+  return order ? JSON.parse(JSON.stringify(order)) : null
+}
+
+export async function saveSummaryOrder(userIds: string[]) {
+  await dbConnect()
+  const week = getNextSaturdayDate()
+
+  const existing = await SummaryOrder.findOne({ week })
+  if (existing) {
+    throw new Error("Summary order already generated for this week")
+  }
+
+  const order = await SummaryOrder.create({
+    week,
+    orderedUserIds: userIds,
+  })
+
+  // Re-fetch to populate
+  const populated = await SummaryOrder.findById(order._id).populate("orderedUserIds").lean()
+  return JSON.parse(JSON.stringify(populated))
 }
