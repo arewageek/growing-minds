@@ -18,6 +18,6 @@ const SelectionSchema = new Schema<ISelection>(
 // Index to ensure only one selection per week
 SelectionSchema.index({ week: 1 }, { unique: true })
 
-const Selection = models.Selection || model<ISelection>("Selection", SelectionSchema)
+const WeeklySelection = models.WeeklySelection || model<ISelection>("WeeklySelection", SelectionSchema)
 
-export default Selection
+export default WeeklySelection

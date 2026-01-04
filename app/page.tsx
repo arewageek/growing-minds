@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { BookOpen, Sprout, Calendar } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-// import { getLatestSelection, saveSelection } from "./actions"
+import { getUsers, getLatestSelection, saveSelection } from "./actions"
 
 interface Candidate {
   id: string
@@ -27,7 +27,7 @@ function getNextSaturday() {
 }
 
 export default function PickerPage() {
-  const [candidates] = useState<Candidate[]>(brandConfig.candidates)
+  const [candidates, setCandidates] = useState<Candidate[]>([])
   const [picking, setPicking] = useState(false)
   const [highlightIdx, setHighlightIdx] = useState<number | null>(null)
   const [winner, setWinner] = useState<Candidate | null>(null)
@@ -41,26 +41,34 @@ export default function PickerPage() {
     setMounted(true)
     setNextSaturday(getNextSaturday())
 
-    // Fetch latest selection from DB
-    /*
-    getLatestSelection().then((selection) => {
-      if (selection) {
-        setWinner({
-          id: selection.candidateId,
-          name: selection.candidateName,
-          color: "", // Not stored in DB but we only need the name/id
-        })
-        setHasSelectedThisWeek(true)
-        setHighlightIdx(candidates.findIndex((c) => c.id === selection.candidateId))
-      }
+    // Fetch all users from DB
+    getUsers().then((users) => {
+      const mappedCandidates = users.map((u: any) => ({
+        id: u._id,
+        name: u.name,
+        color: "bg-primary/20", // Default color
+      }))
+      setCandidates(mappedCandidates)
+
+      // Fetch latest selection from DB after users are loaded
+      getLatestSelection().then((selection) => {
+        if (selection) {
+          setWinner({
+            id: selection.userId._id,
+            name: selection.userId.name,
+            color: "bg-primary/20",
+          })
+          setHasSelectedThisWeek(true)
+          setHighlightIdx(mappedCandidates.findIndex((c: any) => c.id === selection.userId._id))
+        }
+      })
     })
-    */
 
     const savedLastWinner = localStorage.getItem("gm-last-facilitator")
     if (savedLastWinner) {
       setLastWinnerId(savedLastWinner)
     }
-  }, [candidates])
+  }, [])
 
   const pickRandom = useCallback(() => {
     if (picking || hasSelectedThisWeek) return
@@ -82,14 +90,14 @@ export default function PickerPage() {
 
         try {
           // Save to DB
-          // await saveSelection(chosen.id, chosen.name)
+          await saveSelection(chosen.id)
 
           setLastWinnerId(chosen.id)
           localStorage.setItem("gm-last-facilitator", chosen.id)
 
           setHighlightIdx(candidates.findIndex((c) => c.id === chosen.id))
           setWinner(chosen)
-          // setHasSelectedThisWeek(true)
+          setHasSelectedThisWeek(true)
         } catch (error) {
           console.error("Failed to save selection:", error)
           // Maybe show a toast here? For now just reset picking
