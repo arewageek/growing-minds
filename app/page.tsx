@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { BookOpen, Sprout, Calendar } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+// import { getLatestSelection, saveSelection } from "./actions"
+
 interface Candidate {
   id: string
   name: string
@@ -21,7 +23,7 @@ function getNextSaturday() {
   const day = d.getDay()
   const diff = d.getDate() + (6 - day)
   const nextSat = new Date(d.setDate(diff))
-  return nextSat.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+  return nextSat.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
 export default function PickerPage() {
@@ -30,23 +32,45 @@ export default function PickerPage() {
   const [highlightIdx, setHighlightIdx] = useState<number | null>(null)
   const [winner, setWinner] = useState<Candidate | null>(null)
   const [lastWinnerId, setLastWinnerId] = useState<string | null>(null)
+  const [hasSelectedThisWeek, setHasSelectedThisWeek] = useState(false)
+
+  const [mounted, setMounted] = useState(false)
+  const [nextSaturday, setNextSaturday] = useState("")
 
   useEffect(() => {
+    setMounted(true)
+    setNextSaturday(getNextSaturday())
+
+    // Fetch latest selection from DB
+    /*
+    getLatestSelection().then((selection) => {
+      if (selection) {
+        setWinner({
+          id: selection.candidateId,
+          name: selection.candidateName,
+          color: "", // Not stored in DB but we only need the name/id
+        })
+        setHasSelectedThisWeek(true)
+        setHighlightIdx(candidates.findIndex((c) => c.id === selection.candidateId))
+      }
+    })
+    */
+
     const savedLastWinner = localStorage.getItem("gm-last-facilitator")
     if (savedLastWinner) {
       setLastWinnerId(savedLastWinner)
     }
-  }, [])
+  }, [candidates])
 
   const pickRandom = useCallback(() => {
-    if (picking) return
+    if (picking || hasSelectedThisWeek) return
 
     setPicking(true)
     setWinner(null)
 
     let iterations = 0
     const maxIterations = 25
-    const interval = setInterval(() => {
+    const interval = setInterval(async () => {
       setHighlightIdx(Math.floor(Math.random() * candidates.length))
       iterations++
 
@@ -54,23 +78,32 @@ export default function PickerPage() {
         clearInterval(interval)
 
         const availableCandidates = candidates.filter((c) => c.id !== lastWinnerId)
-
         const chosen = availableCandidates[Math.floor(Math.random() * availableCandidates.length)]
 
-        setLastWinnerId(chosen.id)
-        localStorage.setItem("gm-last-facilitator", chosen.id)
+        try {
+          // Save to DB
+          // await saveSelection(chosen.id, chosen.name)
 
-        setHighlightIdx(candidates.findIndex((c) => c.id === chosen.id))
-        setWinner(chosen)
-        setPicking(false)
+          setLastWinnerId(chosen.id)
+          localStorage.setItem("gm-last-facilitator", chosen.id)
+
+          setHighlightIdx(candidates.findIndex((c) => c.id === chosen.id))
+          setWinner(chosen)
+          // setHasSelectedThisWeek(true)
+        } catch (error) {
+          console.error("Failed to save selection:", error)
+          // Maybe show a toast here? For now just reset picking
+        } finally {
+          setPicking(false)
+        }
       }
     }, 100)
-  }, [picking, candidates, lastWinnerId])
+  }, [picking, candidates, lastWinnerId, hasSelectedThisWeek])
 
   return (
-    <main className="min-h-screen p-4 md:p-8 lg:p-12 flex flex-col items-center justify-center relative overflow-hidden bg-background">
-      <div className="absolute top-10 right-10 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10" />
-      <div className="absolute bottom-10 left-10 w-80 h-80 bg-accent/10 rounded-full blur-3xl -z-10" />
+    <main className="min-h-screen p-6 md:p-12 flex flex-col items-center justify-center relative overflow-hidden bg-background">
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/3 rounded-full blur-[120px] -z-10" />
+      <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-accent/5 rounded-full blur-[150px] -z-10" />
 
       <div className="max-w-5xl w-full space-y-8 md:space-y-12 relative z-10">
         <header className="text-center space-y-4">
@@ -81,18 +114,18 @@ export default function PickerPage() {
             <Sprout className="w-3.5 h-3.5 mr-2 inline" />
             Growing Minds
           </Badge>
-          <div className="space-y-2">
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-balance">
+          <div className="space-y-1">
+            <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-balance">
               Next <span className="text-primary">Facilitator</span>
             </h1>
-            <div className="flex items-center justify-center gap-2 text-muted-foreground font-medium">
+            <div className="flex items-center justify-center gap-2 text-muted-foreground/80 font-medium text-sm md:text-base">
               <Calendar className="w-4 h-4" />
-              <span>For Saturday, {getNextSaturday()}</span>
+              <span>{mounted ? nextSaturday : "Loading date..."}</span>
             </div>
           </div>
         </header>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-6 md:gap-8">
           {candidates.map((candidate, idx) => (
             <Card
               key={candidate.id}
@@ -132,10 +165,10 @@ export default function PickerPage() {
                     "transition-all duration-300",
                     highlightIdx === idx || winner?.id === candidate.id
                       ? "opacity-100 translate-y-0"
-                      : "opacity-40 translate-y-1",
+                      : "opacity-60 translate-y-1",
                   )}
                 >
-                  <h3 className="font-semibold text-sm md:text-base tracking-tight truncate max-w-[100px] sm:max-w-none">
+                  <h3 className="font-medium text-sm md:text-base tracking-tight truncate max-w-[100px] sm:max-w-none">
                     {candidate.name}
                   </h3>
                 </div>
@@ -148,10 +181,10 @@ export default function PickerPage() {
           <Button
             size="lg"
             onClick={pickRandom}
-            disabled={picking}
+            disabled={picking || hasSelectedThisWeek}
             className="h-12 md:h-14 px-8 md:px-12 rounded-full text-base md:text-lg font-bold bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
           >
-            {picking ? "Selecting..." : "Pick Facilitator"}
+            {picking ? "Selecting..." : hasSelectedThisWeek ? "Selection Locked" : "Pick Facilitator"}
           </Button>
 
           {winner && (
