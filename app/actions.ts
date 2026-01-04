@@ -15,7 +15,19 @@ function getNextSaturdayDate() {
 export async function getUsers() {
   await dbConnect()
   const users = await User.find({}).lean()
-  return JSON.parse(JSON.stringify(users))
+  
+  // Get selection counts for all users
+  const usersWithCounts = await Promise.all(
+    users.map(async (user: any) => {
+      const count = await WeeklySelection.countDocuments({ userId: user._id })
+      return {
+        ...user,
+        selectionCount: count,
+      }
+    })
+  )
+
+  return JSON.parse(JSON.stringify(usersWithCounts))
 }
 
 export async function getLatestSelection() {

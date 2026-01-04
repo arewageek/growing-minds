@@ -16,6 +16,7 @@ interface Candidate {
   name: string
   color: string
   avatar?: string
+  selectionCount: number
 }
 
 function getNextSaturday() {
@@ -24,6 +25,14 @@ function getNextSaturday() {
   const diff = d.getDate() + (6 - day)
   const nextSat = new Date(d.setDate(diff))
   return nextSat.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
+function getInitials(name: string) {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
 }
 
 export default function PickerPage() {
@@ -47,6 +56,7 @@ export default function PickerPage() {
         id: u._id,
         name: u.name,
         color: "bg-primary/20", // Default color
+        selectionCount: u.selectionCount || 0,
       }))
       setCandidates(mappedCandidates)
 
@@ -86,7 +96,26 @@ export default function PickerPage() {
         clearInterval(interval)
 
         const availableCandidates = candidates.filter((c) => c.id !== lastWinnerId)
-        const chosen = availableCandidates[Math.floor(Math.random() * availableCandidates.length)]
+        
+        // --- Weighted Random Logic ---
+        // Favor those with fewer selection counts
+        // Weight = (MaxCount + 1) - count
+        const counts = availableCandidates.map(c => c.selectionCount)
+        const maxCount = Math.max(...counts)
+        const weights = availableCandidates.map(c => (maxCount + 1) - c.selectionCount)
+        const totalWeight = weights.reduce((acc, w) => acc + w, 0)
+        
+        let random = Math.random() * totalWeight
+        let chosen = availableCandidates[0]
+        
+        for (let i = 0; i < weights.length; i++) {
+          if (random < weights[i]) {
+            chosen = availableCandidates[i]
+            break
+          }
+          random -= weights[i]
+        }
+        // -----------------------------
 
         try {
           // Save to DB
@@ -117,16 +146,16 @@ export default function PickerPage() {
         <header className="text-center space-y-4">
           <Badge
             variant="outline"
-            className="px-4 py-1 text-primary border-primary/20 bg-primary/5 rounded-full font-medium tracking-wide"
+            className="px-4 py-1 text-base text-primary border-primary/20 bg-primary/5 rounded-full font-medium tracking-wide"
           >
             <Sprout className="w-3.5 h-3.5 mr-2 inline" />
-            Growing Minds
+            Next Facilitator Selection
           </Badge>
           <div className="space-y-1">
-            <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-balance">
-              Next <span className="text-primary">Facilitator</span>
+            <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-balance">
+              Growing <span className="text-primary">Minds</span>
             </h1>
-            <div className="flex items-center justify-center gap-2 text-muted-foreground/80 font-medium text-sm md:text-base">
+            <div className="flex items-center justify-center gap-2 text-muted-foreground/80 font-medium text-sm md:text-base mt-2">
               <Calendar className="w-4 h-4" />
               <span>{mounted ? nextSaturday : "Loading date..."}</span>
             </div>
@@ -152,15 +181,22 @@ export default function PickerPage() {
                   />
                   <Avatar
                     className={cn(
-                      "w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 border-2 transition-all duration-300",
+                      "w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 transition-all duration-300 border-2",
                       highlightIdx === idx
-                        ? "border-primary shadow-xl shadow-primary/20 scale-110"
-                        : "border-transparent opacity-50 grayscale group-hover:grayscale-0 group-hover:opacity-100",
-                      winner?.id === candidate.id && "border-primary ring-4 ring-primary/10 opacity-100 grayscale-0",
+                        ? "border-primary shadow-2xl shadow-primary/30 scale-110 z-20"
+                        : "border-border/50 opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-100",
+                      winner?.id === candidate.id && "border-primary ring-8 ring-primary/5 opacity-100 grayscale-0",
                     )}
                   >
-                    <AvatarImage src={candidate.avatar || "/placeholder.svg"} alt={candidate.name} />
-                    <AvatarFallback className={candidate.color}>{candidate.name[0]}</AvatarFallback>
+                    <AvatarImage src={candidate.avatar} alt={candidate.name} />
+                    <AvatarFallback
+                      className={cn(
+                        "text-2xl md:text-3xl font-bold tracking-tighter bg-linear-to-br from-primary/10 to-primary/30 text-primary",
+                        highlightIdx === idx && "from-primary to-primary/80 text-primary-foreground",
+                      )}
+                    >
+                      {getInitials(candidate.name)}
+                    </AvatarFallback>
                   </Avatar>
                   {winner?.id === candidate.id && (
                     <div className="absolute -top-1 -right-1 bg-primary text-white p-1.5 rounded-full shadow-lg animate-in zoom-in duration-300">
@@ -176,9 +212,12 @@ export default function PickerPage() {
                       : "opacity-60 translate-y-1",
                   )}
                 >
-                  <h3 className="font-medium text-sm md:text-base tracking-tight truncate max-w-[100px] sm:max-w-none">
+                  <h3 className="font-semibold text-sm md:text-base tracking-tight truncate max-w-[100px] sm:max-w-none">
                     {candidate.name}
                   </h3>
+                  <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest mt-0.5">
+                    Picked {candidate.selectionCount} {candidate.selectionCount === 1 ? "time" : "times"}
+                  </p>
                 </div>
               </CardContent>
             </Card>
