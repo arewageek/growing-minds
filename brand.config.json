@@ -1,0 +1,29 @@
+{
+  "candidates": [
+    {
+      "id": "1",
+      "name": "Innocent",
+      "color": "bg-emerald-600"
+    },
+    {
+      "id": "2",
+      "name": "Austin",
+      "color": "bg-green-600"
+    },
+    {
+      "id": "3",
+      "name": "Oyiza",
+      "color": "bg-teal-600"
+    },
+    {
+      "id": "4",
+      "name": "Victor",
+      "color": "bg-lime-600"
+    },
+    {
+      "id": "5",
+      "name": "Daniel",
+      "color": "bg-forest-600"
+    }
+  ]
+}
