@@ -35,6 +35,32 @@ function getInitials(name: string) {
     .toUpperCase()
 }
 
+function shuffle<T>(array: T[]): T[] {
+  // 1. Initial Sort (for consistent starting point)
+  const sorted = [...array].sort((a, b) => String(a).localeCompare(String(b)))
+
+  // 2. First Pass Randomization
+  const randomized = [...sorted]
+  for (let i = randomized.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [randomized[i], randomized[j]] = [randomized[j], randomized[i]]
+  }
+
+  // 3. Custom random placement (picking random index, repeating if filled)
+  const result = new Array(array.length).fill(null)
+  for (const item of randomized) {
+    let placed = false
+    while (!placed) {
+      const randomIndex = Math.floor(Math.random() * array.length)
+      if (result[randomIndex] === null) {
+        result[randomIndex] = item
+        placed = true
+      }
+    }
+  }
+  return result
+}
+
 export default function PickerPage() {
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [picking, setPicking] = useState(false)
@@ -150,10 +176,9 @@ export default function PickerPage() {
     if (!candidates.length || summaryOrder) return
     setIsGeneratingOrder(true)
 
-    // 100% Random shuffle
-    const shuffledIds = candidates
-      .map((c) => c.id)
-      .sort(() => Math.random() - 0.5)
+    // 100% Random Fisher-Yates shuffle
+    const userIds = candidates.map((c) => c.id)
+    const shuffledIds = shuffle(userIds)
 
     try {
       const order = await saveSummaryOrder(shuffledIds)
